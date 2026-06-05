@@ -1,0 +1,202 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/0.1.2-preview/CreateUIDefinition.MultiVm.json#",
+  "handler": "Microsoft.Azure.CreateUIDef",
+  "version": "0.1.2-preview",
+  "parameters": {
+    "config": {
+      "isWizard": true,
+      "basics": {
+        "description": "## ![Conosco](TODO-REPLACE-WITH-PUBLICLY-HOSTED-LOGO-URL) Conosco Managed Sentinel\n\nDeploys a fully configured Microsoft Sentinel workspace to a client tenant. All resources are provisioned in **UK South**.\n\n**What this deploys:**\n- Log Analytics Workspace (90-day retention, pay-as-you-go)\n- Microsoft Sentinel\n- UEBA (User and Entity Behaviour Analytics)\n- Selected data connectors\n- Playbook permissions for Logic App automation\n\n> **Note:** Analytics rules and automation rules are deployed separately via DevOps after connector tables are populated.",
+        "logo": {
+          "uri": "TODO-REPLACE-WITH-PUBLICLY-HOSTED-LOGO-URL",
+          "alt": "Conosco"
+        }
+      }
+    },
+    "basics": [
+      {
+        "name": "clientName",
+        "type": "Microsoft.Common.TextBox",
+        "label": "Client identifier",
+        "placeholder": "contoso",
+        "toolTip": "Short lowercase identifier for the client. Used to name all resources: cns-<identifier>-sentinel. Lowercase letters, numbers and hyphens only.",
+        "constraints": {
+          "required": true,
+          "validations": [
+            {
+              "regex": "^[a-z0-9][a-z0-9-]{0,18}[a-z0-9]$",
+              "message": "2-20 characters. Lowercase letters, numbers and hyphens only. Cannot start or end with a hyphen."
+            }
+          ]
+        }
+      },
+      {
+        "name": "namingPreview",
+        "type": "Microsoft.Common.InfoBox",
+        "options": {
+          "icon": "Info",
+          "text": "[concat('Resources will be named: cns-', basics('clientName'), '-sentinel')]"
+        }
+      },
+      {
+        "name": "locationNote",
+        "type": "Microsoft.Common.InfoBox",
+        "options": {
+          "icon": "Info",
+          "text": "All resources are deployed to UK South. The resource group location does not need to match."
+        }
+      }
+    ],
+    "steps": [
+      {
+        "name": "connectors",
+        "label": "Data Connectors",
+        "elements": [
+          {
+            "name": "connectorInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "options": {
+              "icon": "Warning",
+              "text": "All connectors are selected by default. Deselect any connector for which this client does not have the required licence. Attempting to enable an unlicensed connector will not break the deployment \u2014 it will be skipped with a warning in the deployment log \u2014 but it is cleaner to deselect upfront."
+            }
+          },
+          {
+            "name": "core",
+            "type": "Microsoft.Common.Section",
+            "label": "Core (no additional licence required)",
+            "elements": [
+              {
+                "name": "connAzureActivity",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Azure Activity",
+                "defaultValue": true,
+                "toolTip": "No additional licence required. Included with any Azure subscription.",
+                "constraints": {
+                  "required": false
+                }
+              },
+              {
+                "name": "connMDTI",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Microsoft Defender Threat Intelligence",
+                "defaultValue": true,
+                "toolTip": "Free tier available with any Sentinel workspace. No separate licence needed.",
+                "constraints": {
+                  "required": false
+                }
+              }
+            ]
+          },
+          {
+            "name": "m365def",
+            "type": "Microsoft.Common.Section",
+            "label": "Microsoft 365 and Defender",
+            "elements": [
+              {
+                "name": "connO365",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Microsoft 365",
+                "defaultValue": true,
+                "toolTip": "Requires Microsoft 365 Business Basic/Standard/Premium, E3, or E5.",
+                "constraints": {
+                  "required": false
+                }
+              },
+              {
+                "name": "connIRM",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Microsoft 365 Insider Risk Management",
+                "defaultValue": true,
+                "toolTip": "Requires Microsoft 365 E5 Compliance, Microsoft 365 E5, or the Insider Risk Management add-on.",
+                "constraints": {
+                  "required": false
+                }
+              },
+              {
+                "name": "connMCAS",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Microsoft Defender for Cloud Apps",
+                "defaultValue": true,
+                "toolTip": "Requires Microsoft 365 E5 or a standalone Defender for Cloud Apps licence.",
+                "constraints": {
+                  "required": false
+                }
+              },
+              {
+                "name": "connMDE",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Microsoft Defender for Endpoint",
+                "defaultValue": true,
+                "toolTip": "Requires MDE Plan 1 or Plan 2. Included in Microsoft 365 E5/A5/G5.",
+                "constraints": {
+                  "required": false
+                }
+              },
+              {
+                "name": "connMDI",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Microsoft Defender for Identity",
+                "defaultValue": true,
+                "toolTip": "Requires a standalone Defender for Identity licence or Microsoft 365 E5.",
+                "constraints": {
+                  "required": false
+                }
+              },
+              {
+                "name": "connMDO",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Microsoft Defender for Office 365",
+                "defaultValue": true,
+                "toolTip": "Requires MDO Plan 1 or Plan 2. Included in Microsoft 365 E5.",
+                "constraints": {
+                  "required": false
+                }
+              },
+              {
+                "name": "connXDR",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Microsoft Defender XDR",
+                "defaultValue": true,
+                "toolTip": "Requires at least one Microsoft 365 Defender product licence (MDE, MDO, MDI, or MCAS).",
+                "constraints": {
+                  "required": false
+                }
+              }
+            ]
+          },
+          {
+            "name": "entra",
+            "type": "Microsoft.Common.Section",
+            "label": "Microsoft Entra ID",
+            "elements": [
+              {
+                "name": "connEntraID",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Microsoft Entra ID",
+                "defaultValue": true,
+                "toolTip": "Basic sign-in and audit logs available with Azure AD Free. Non-interactive, service account, risky user data requires AAD P1 or P2.",
+                "constraints": {
+                  "required": false
+                }
+              },
+              {
+                "name": "connEntraIDProt",
+                "type": "Microsoft.Common.CheckBox",
+                "label": "Microsoft Entra ID Protection",
+                "defaultValue": true,
+                "toolTip": "Requires Azure AD P2 (Microsoft Entra ID P2). Not available with Free or P1 licences.",
+                "constraints": {
+                  "required": false
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "outputs": {
+      "clientName": "[basics('clientName')]",
+      "enabledConnectors": "[concat(if(steps('connectors').core.connAzureActivity, 'AzureActivity,', ''), if(steps('connectors').core.connMDTI, 'MicrosoftThreatIntelligence,', ''), if(steps('connectors').m365def.connO365, 'Office365,', ''), if(steps('connectors').m365def.connIRM, 'OfficeIRM,', ''), if(steps('connectors').m365def.connMCAS, 'MicrosoftCloudAppSecurity,', ''), if(steps('connectors').m365def.connMDE, 'MicrosoftDefenderAdvancedThreatProtection,', ''), if(steps('connectors').m365def.connMDI, 'AzureAdvancedThreatProtection,', ''), if(steps('connectors').m365def.connMDO, 'OfficeATP,', ''), if(steps('connectors').m365def.connXDR, 'MicrosoftThreatProtection,', ''), if(steps('connectors').entra.connEntraID, 'AzureActiveDirectory,', ''), if(steps('connectors').entra.connEntraIDProt, 'AzureActiveDirectoryIdentityProtection,', ''))]"
+    }
+  }
+}
