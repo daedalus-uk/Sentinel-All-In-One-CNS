@@ -6,7 +6,7 @@
     "config": {
       "isWizard": true,
       "basics": {
-        "description": "## ![Conosco](https://conosco.com/hs-fs/hubfs/conosco_icon_lightbg%20(1).png?width=83&height=62&name=conosco_icon_lightbg%20(1).png) Conosco Managed Sentinel\n\nDeploys a fully configured Microsoft Sentinel workspace to a client tenant. All resources are provisioned in **UK South**.\n\n**What this deploys:**\n- Log Analytics Workspace (90-day retention, pay-as-you-go)\n- Microsoft Sentinel\n- UEBA (User and Entity Behaviour Analytics)\n- Selected data connectors\n- Playbook permissions for Logic App automation\n\n> **Note:** Analytics rules and automation rules are deployed separately via DevOps after connector tables are populated.",
+        "description": "##Conosco Managed Sentinel\n\nDeploys a fully configured Microsoft Sentinel workspace to a client tenant. All resources are provisioned in **UK South**.\n\n**What this deploys:**\n- Log Analytics Workspace (90-day retention, pay-as-you-go)\n- Microsoft Sentinel\n- UEBA (User and Entity Behaviour Analytics)\n- Selected data connectors\n- Playbook permissions for Logic App automation\n\n> **Note:** Analytics rules and automation rules are deployed separately via DevOps after connector tables are populated.",
         "logo": {
           "uri": "https://conosco.com/hs-fs/hubfs/conosco_icon_lightbg%20(1).png?width=83&height=62&name=conosco_icon_lightbg%20(1).png",
           "alt": "Conosco"
