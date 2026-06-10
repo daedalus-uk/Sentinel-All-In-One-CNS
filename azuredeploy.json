@@ -84,6 +84,18 @@
       }
     },
     {
+      "comments": "Formally onboards the workspace to Microsoft Sentinel. Required in addition to the SecurityInsights solution \u2014 without this, SecurityInsights API calls return 'workspace is not onboarded' errors.",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/onboardingStates",
+      "apiVersion": "2024-03-01",
+      "name": "[concat(variables('workspaceName'), '/Microsoft.SecurityInsights/default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationsManagement/solutions', concat('SecurityInsights(', variables('workspaceName'), ')'))]"
+      ],
+      "properties": {
+        "customerManagedKey": false
+      }
+    },
+    {
       "comments": "ARM Deployment Script - waits for RBAC propagation, then configures UEBA, the selected data connectors, and playbook permissions via the SecurityInsights REST API.",
       "type": "Microsoft.Resources/deploymentScripts",
       "apiVersion": "2023-08-01",
@@ -98,7 +110,7 @@
       },
       "dependsOn": [
         "[resourceId('Microsoft.Authorization/roleAssignments', variables('roleAssignmentName'))]",
-        "[resourceId('Microsoft.OperationsManagement/solutions', concat('SecurityInsights(', variables('workspaceName'), ')'))]"
+        "[resourceId('Microsoft.OperationalInsights/workspaces/providers/onboardingStates', variables('workspaceName'), 'Microsoft.SecurityInsights', 'default')]"
       ],
       "properties": {
         "azPowerShellVersion": "11.0",
