@@ -18,15 +18,11 @@ continue with Step 2 below. See "Deploy to Azure button" for pinning to a releas
 
 ```
 conosco-sentinel/
-├── azuredeploy.json                        # Step 1: infrastructure (workspace, Sentinel, onboarding)
-├── createUiDefinition.json                 # Portal wizard for the template
-├── generate-deploy-link.py                 # Builds the Deploy to Azure button link
-├── scripts/
-│   └── Configure-SentinelSettings.ps1      # Step 2: UEBA, connectors, playbook permissions (run as admin)
-├── automation/
-│   └── azuredeploy-automation.json         # Automation rules + local playbooks (deploy after Step 2)
-└── lighthouse/
-    └── azuredeploy-lighthouse.json         # Reference Lighthouse delegation (Conosco uses its own)
+├── azuredeploy.json                    # Step 1: infrastructure (workspace, Sentinel, onboarding)
+├── createUiDefinition.json             # Portal wizard for the template
+├── Configure-SentinelSettings.ps1      # Step 2: UEBA, connectors, playbook permissions (run as admin)
+├── azuredeploy-automation.json         # Step 4: automation rules + local playbooks (deploy after Step 2)
+└── Conosco Lighthouse Offering.json    # Step 3: Lighthouse delegation for the Conosco SOC team
 ```
 
 ---
@@ -107,16 +103,16 @@ playbook permission grant. Supports `-WhatIf` and writes a timestamped audit log
 Connect-AzAccount -Tenant <CLIENT-TENANT-ID>
 
 # Dry run first
-.\scripts\Configure-SentinelSettings.ps1 -ClientName contoso -WhatIf
+.\Configure-SentinelSettings.ps1 -ClientName contoso -WhatIf
 
 # Apply
-.\scripts\Configure-SentinelSettings.ps1 -ClientName contoso
+.\Configure-SentinelSettings.ps1 -ClientName contoso
 ```
 
 Drop any connector the client is not licensed for:
 
 ```powershell
-.\scripts\Configure-SentinelSettings.ps1 -ClientName contoso `
+.\Configure-SentinelSettings.ps1 -ClientName contoso `
   -EnabledConnectors AzureActivity,Office365,AzureActiveDirectory,MicrosoftThreatProtection
 ```
 
@@ -153,8 +149,8 @@ audit log the script writes for the per-connector result.
 
 ## Step 3 (per client): Lighthouse delegation
 
-Conosco deploys its own Lighthouse offering to delegate client resources to the SOC team. The
-reference template under `lighthouse/` is illustrative only.
+Conosco deploys its own Lighthouse offering to delegate client resources to the SOC team. This is
+the `Conosco Lighthouse Offering.json` template, deployed at subscription scope in the client tenant.
 
 If you use the managing-tenant automation rules (see below), the Lighthouse setup must also grant
 the Azure Security Insights app the **Microsoft Sentinel Automation Contributor** role
@@ -164,7 +160,7 @@ tenant, and it must be in place before those rules are deployed, or rule creatio
 
 ---
 
-## Step 4: automation rules and playbooks (automation/azuredeploy-automation.json)
+## Step 4: automation rules and playbooks (azuredeploy-automation.json)
 
 Deploy after Step 2, once connectors have started populating their tables (typically 15-30 minutes),
 so analytics and automation rules validate against existing data.
@@ -177,7 +173,7 @@ Contributor grant is in place, or set it false to deploy only the local rules.
 ```bash
 az deployment group create \
   --resource-group "cns-${CLIENT}-sentinel" \
-  --template-file automation/azuredeploy-automation.json \
+  --template-file azuredeploy-automation.json \
   --parameters clientName="${CLIENT}" tenantId="<CLIENT-TENANT-ID>" \
                clientDisplayName="Contoso Ltd" \
                primaryContact="..." secondaryContact="..." \
@@ -193,14 +189,12 @@ Sentinel connections use managed identity and need no action.
 ## Deploy to Azure button
 
 The button covers Step 1 only. It requires the template and wizard to be reachable anonymously over
-HTTPS, so the repository holding them must be public. These files contain no secrets. Generate the
-link with:
+HTTPS, so the repository holding them must be public. These files contain no secrets.
 
-```bash
-python3 generate-deploy-link.py daedalus-uk Sentinel-All-In-One-CNS main
-```
-
-The raw URLs the button points at must resolve:
+The button link is defined at the top of this README. It is a portal URL with the raw URLs of
+`azuredeploy.json` and `createUiDefinition.json` URL-encoded into it. To point it at a different
+repo, branch, or release tag, update those two encoded URLs in the link. The raw URLs it currently
+targets must resolve:
 `https://raw.githubusercontent.com/daedalus-uk/Sentinel-All-In-One-CNS/main/azuredeploy.json` and
 the matching `createUiDefinition.json`. To pin deployments to a known-good version, point the link
 at a release tag instead of `main`.
