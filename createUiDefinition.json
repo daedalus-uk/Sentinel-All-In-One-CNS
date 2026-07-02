@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/0.1.2-preview/CreateUIDefinition.MultiVm.json#",
+  "handler": "Microsoft.Azure.CreateUIDef",
+  "version": "0.1.2-preview",
+  "parameters": {
+    "config": {
+      "isWizard": true,
+      "basics": {
+        "description": "## Conosco Managed Sentinel\n\nDeploys the Microsoft Sentinel infrastructure for a client tenant: Log Analytics workspace (90-day retention, pay-as-you-go), the Sentinel solution, and Sentinel onboarding. All resources are provisioned in **UK South**.\n\n> **Two-step deployment.** This template provisions the workspace and onboards Sentinel only. After it completes, run `Configure-SentinelSettings.ps1` signed in as the onboarding administrator to enable UEBA, the data connectors, and playbook permissions. Those steps require Entra directory roles that a template can't hold, so they run in your own context."
+      }
+    },
+    "basics": [
+      {
+        "name": "clientName",
+        "type": "Microsoft.Common.TextBox",
+        "label": "Client identifier",
+        "placeholder": "contoso",
+        "toolTip": "Short lowercase identifier for the client. Used to name all resources: cns-<identifier>-sentinel. Lowercase letters, numbers and hyphens only.",
+        "constraints": {
+          "required": true,
+          "validations": [
+            {
+              "regex": "^[a-z0-9][a-z0-9-]{0,18}[a-z0-9]$",
+              "message": "2-20 characters. Lowercase letters, numbers and hyphens only. Cannot start or end with a hyphen."
+            }
+          ]
+        }
+      },
+      {
+        "name": "namingPreview",
+        "type": "Microsoft.Common.InfoBox",
+        "options": {
+          "icon": "Info",
+          "text": "[concat('Resources will be named: cns-', basics('clientName'), '-sentinel')]"
+        }
+      },
+      {
+        "name": "locationNote",
+        "type": "Microsoft.Common.InfoBox",
+        "options": {
+          "icon": "Info",
+          "text": "All resources are deployed to UK South. The resource group location does not need to match."
+        }
+      }
+    ],
+    "steps": [],
+    "outputs": {
+      "clientName": "[basics('clientName')]"
+    }
+  }
+}

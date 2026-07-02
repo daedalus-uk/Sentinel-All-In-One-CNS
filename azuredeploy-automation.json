@@ -1,0 +1,1117 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "clientName": {
+      "type": "string",
+      "metadata": {
+        "description": "Must match the clientName used in the main deployment."
+      }
+    },
+    "tenantId": {
+      "type": "string",
+      "metadata": {
+        "description": "Client (customer) Azure AD tenant ID. Used as the tenantId for locally-deployed playbooks."
+      }
+    },
+    "clientDisplayName": {
+      "type": "string",
+      "metadata": {
+        "description": "Human-readable client name used in playbook emails and comments (e.g. 'Contoso Ltd')."
+      }
+    },
+    "socAlertEmail": {
+      "type": "string",
+      "defaultValue": "soc-alerts@conosco.com",
+      "metadata": {
+        "description": "SOC alert inbox. Switch to soc-ooh@conosco.com once the Halo workflow is live."
+      }
+    },
+    "primaryContact": {
+      "type": "string",
+      "metadata": {
+        "description": "Primary security contact email at the client."
+      }
+    },
+    "secondaryContact": {
+      "type": "string",
+      "metadata": {
+        "description": "Secondary security contact email at the client."
+      }
+    },
+    "accountManager": {
+      "type": "string",
+      "metadata": {
+        "description": "Conosco Account Manager email."
+      }
+    },
+    "headOfSupport": {
+      "type": "string",
+      "metadata": {
+        "description": "Conosco Head of Support email."
+      }
+    },
+    "conoscoSubscriptionId": {
+      "type": "string",
+      "defaultValue": "71c8944f-7196-43e7-b07c-192c8f72ad92",
+      "metadata": {
+        "description": "Conosco managing-tenant subscription ID hosting the central playbooks."
+      }
+    },
+    "conoscoResourceGroup": {
+      "type": "string",
+      "defaultValue": "Conosco_Sentinel_RG",
+      "metadata": {
+        "description": "Resource group in the Conosco tenant holding the central playbooks."
+      }
+    },
+    "conoscoTenantId": {
+      "type": "string",
+      "defaultValue": "4ccdd9df-c201-4d7b-b4b5-419eb462fdd5",
+      "metadata": {
+        "description": "Conosco managing tenant ID. Used as the tenantId for cross-tenant playbook actions."
+      }
+    },
+    "deployManagingTenantRules": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Deploy the four rules that call central playbooks in the Conosco tenant. Requires the Azure Security Insights app to hold Microsoft Sentinel Automation Contributor on the Conosco playbook RG (via Lighthouse) BEFORE deployment, or rule creation will fail. Set false to deploy only the local rules during testing."
+      }
+    }
+  },
+  "variables": {
+    "workspaceName": "[concat('cns-', parameters('clientName'), '-sentinel')]",
+    "centralPlaybookPrefix": "[concat('/subscriptions/', parameters('conoscoSubscriptionId'), '/resourceGroups/', parameters('conoscoResourceGroup'), '/providers/Microsoft.Logic/workflows/')]"
+  },
+  "resources": [
+    {
+      "comments": "Deploy Send_Incident_To_Conosco_SOC (workflow + connections) into the client RG. Authorise the Azureblob and Office365 connections in the portal after deployment.",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "deploy-playbook-send-incident",
+      "properties": {
+        "mode": "Incremental",
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "parameters": {
+          "Client Name": {
+            "value": "[parameters('clientDisplayName')]"
+          },
+          "SendToEmail": {
+            "value": "[parameters('socAlertEmail')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "title": "",
+            "description": "",
+            "prerequisites": "",
+            "postDeployment": [],
+            "prerequisitesDeployTemplateFile": "",
+            "lastUpdateTime": "",
+            "entities": [],
+            "tags": [],
+            "support": {
+              "tier": "community",
+              "armtemplate": "Generated from https://github.com/Azure/Azure-Sentinel/tree/master/Tools/Playbook-ARM-Template-Generator"
+            },
+            "author": {
+              "name": ""
+            }
+          },
+          "parameters": {
+            "PlaybookName": {
+              "defaultValue": "Send_Incident_To_Conosco_SOC",
+              "type": "string"
+            },
+            "Client Name": {
+              "type": "String",
+              "metadata": {
+                "description": "Enter value for Client Name"
+              }
+            },
+            "SendToEmail": {
+              "type": "String",
+              "metadata": {
+                "description": "Enter value for SendToEmail, should be soc-alerts@conosco.com. Once the Halo workflow is completed, change to soc-ooh@conosco.com"
+              }
+            }
+          },
+          "variables": {
+            "MicrosoftSentinelConnectionName": "[concat('MicrosoftSentinel-', parameters('PlaybookName'))]",
+            "AzureblobConnectionName": "[concat('Azureblob-', parameters('PlaybookName'))]",
+            "Office365ConnectionName": "[concat('Office365-', parameters('PlaybookName'))]"
+          },
+          "resources": [
+            {
+              "properties": {
+                "provisioningState": "Succeeded",
+                "state": "Enabled",
+                "definition": {
+                  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                  "contentVersion": "1.0.0.0",
+                  "parameters": {
+                    "$connections": {
+                      "defaultValue": {},
+                      "type": "Object"
+                    },
+                    "Client Name": {
+                      "type": "String",
+                      "defaultValue": "[parameters('Client Name')]"
+                    },
+                    "SendToEmail": {
+                      "type": "String",
+                      "defaultValue": "[parameters('SendToEmail')]"
+                    }
+                  },
+                  "triggers": {
+                    "Microsoft_Sentinel_incident": {
+                      "type": "ApiConnectionWebhook",
+                      "inputs": {
+                        "host": {
+                          "connection": {
+                            "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                          }
+                        },
+                        "body": {
+                          "callback_url": "@listCallbackUrl()"
+                        },
+                        "path": "/incident-creation"
+                      }
+                    }
+                  },
+                  "actions": {
+                    "Compose": {
+                      "runAfter": {
+                        "Get_blob_content_(V2)": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "Compose",
+                      "inputs": "@base64ToString(body('Get_blob_content_(V2)')['$content'])"
+                    },
+                    "Compose_Email_response": {
+                      "runAfter": {
+                        "Create_HTML_table_with_Alerts": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "Compose",
+                      "inputs": "<!DOCTYPE html>\n<html>\n\n<table style=\"width: 100%; border-collapse: collapse;\" border=\"1\" width=\"100%\">\n\n<tbody>\n\n<tr>\n<td style=\"width: 19%;\" align=\"center\" width=\"19%\">\n<strong><img src=\"https://azure.microsoft.com/svghandler/azure-sentinel?width=150&amp;height=79\" alt=\"\" /></strong>\n</td>\n\n<td style=\"width: 41.1434%;\" width=\"48%\">\n<p style=\"text-align: center;\"><span style=\"font-size: 16pt;\"><strong>@{parameters('Client Name')}</strong></span></p>\n<p style=\"text-align: center;\"><strong>Azure Sentinel Incident Report</strong></p>\n</td>\n\n<td style=\"width: 20%;\" width=\"20%\">\n<p><span style=\"font-size: 12pt;\"><strong>Incident ID: @{triggerBody()?['object']?['properties']?['incidentNumber']}</strong></span></p>\n<p><span style=\"font-size: 13pt;\"><strong><a href=\"@{triggerBody()?['object']?['properties']?['incidentUrl']}\">View incident</a></strong></span></p>\n</td>\n\n<td style=\"width: 13%;\" align=\"center\" width=\"13%\">\n<strong><img src=\"https://azure.microsoft.com/svghandler/azure-sentinel?width=150&amp;height=79\" alt=\"\" /></strong>\n</td>\n\n</tr>\n\n<tr>\n<td style=\"width: 93.1434%;\" colspan=\"4\" width=\"100%\">\n<p>Incident Title:</p>\n<p><span style=\"font-size: 16pt;\"><strong>@{triggerBody()?['object']?['properties']?['title']}</strong></span></p>\n<p>&nbsp;</p>\n</td>\n</tr>\n\n</tbody>\n</table>\n\n<table style=\"width: 100%; border-collapse: collapse;\" border=\"1\" width=\"100%\">\n\n<tbody>\n\n<tr style=\"vertical-align: top;\">\n<td style=\"width: 23.25%; height: 190px;\">\n<p><span style=\"font-size: 12pt;\"><strong>Creation time</strong></span><br /><br/>\n<span style=\"font-size: 12.0pt;\">@{triggerBody()?['object']?['properties']?['createdTimeUtc']}</span></p>\n</td>\n\n<td style=\"width: 23.25%; height: 190px;\">\n<p><span style=\"font-size: 12pt;\"><strong>Severity</strong></span><br /><br/>\n<span style=\"font-size: 12.0pt;\">@{triggerBody()?['object']?['properties']?['severity']}</span></p>\n</td>\n\n<td style=\"width: 23.3934%; height: 190px;\">\n<p><span style=\"font-size: 12pt;\"><strong>Alert providers</strong></span><br /><br/>\n<span style=\"font-size: 12.0pt;\">@{join(triggerBody()?['object']?['properties']?['additionalData']?['alertProductNames'], '<br />')}</span></p>\n</td>\n\n<td style=\"width: 23.25%; height: 190px;\">\n<p><span style=\"font-size: 12pt;\"><strong>Tactics</strong></span><br /><br/>\n<span style=\"font-size: 12.0pt;\">@{join(triggerBody()?['object']?['properties']?['additionalData']?['tactics'], '<br />')}</span></p>\n</td>\n</tr>\n\n<td style=\"width: 93.1434%;\" colspan=\"4\" width=\"100%\">\n<p><span style=\"font-size: 12pt;\"><strong>Description</strong></span><br /><br />\n<span style=\"font-size: 12.0pt;\">@{triggerBody()?['object']?['properties']?['description']}</span></p>\n</td>\n</tr>\n\n<tr>\n<td style=\"width: 46.5%;\" colspan=\"2\" width=\"50%\">\n<p><span style=\"font-size: 12pt;\"><strong>Entities</strong></span></p>\n<p>@{body('Create_HTML_table_with_Entities')}</p>\n<p>&nbsp;</p>\n</td>\n\n<td style=\"width: 46.6434%;\" colspan=\"2\" width=\"50%\">\n@{body('Create_HTML_table_with_Alerts')}\n</td>\n\n</tr>\n\n</tbody>\n</table>\n</html>"
+                    },
+                    "Create_HTML_table_with_Alerts": {
+                      "runAfter": {
+                        "Select_Alerts": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "Table",
+                      "inputs": {
+                        "from": "@body('Select_Alerts')",
+                        "format": "HTML"
+                      }
+                    },
+                    "Create_HTML_table_with_Entities": {
+                      "runAfter": {
+                        "Select_Entities": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "Table",
+                      "inputs": {
+                        "from": "@body('Select_Entities')",
+                        "format": "HTML"
+                      }
+                    },
+                    "For_each_value_in_the_JSON": {
+                      "foreach": "@body('Parse_JSON')",
+                      "actions": {
+                        "Condition": {
+                          "actions": {
+                            "Set_variable": {
+                              "type": "SetVariable",
+                              "inputs": {
+                                "name": "ContactSOCOOH",
+                                "value": "Contact SOC | "
+                              }
+                            }
+                          },
+                          "else": {
+                            "actions": {}
+                          },
+                          "expression": {
+                            "and": [
+                              {
+                                "contains": [
+                                  "@triggerBody()?['object']?['properties']?['title']",
+                                  "@items('For_each_value_in_the_JSON')"
+                                ]
+                              }
+                            ]
+                          },
+                          "type": "If"
+                        }
+                      },
+                      "runAfter": {
+                        "Parse_JSON": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "Foreach"
+                    },
+                    "Initialize_ContactSOCOOH": {
+                      "runAfter": {},
+                      "type": "InitializeVariable",
+                      "inputs": {
+                        "variables": [
+                          {
+                            "name": "ContactSOCOOH",
+                            "type": "string",
+                            "value": "@{null}"
+                          }
+                        ]
+                      }
+                    },
+                    "Parse_JSON": {
+                      "runAfter": {
+                        "Compose": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "ParseJson",
+                      "inputs": {
+                        "content": "@outputs('Compose')",
+                        "schema": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        }
+                      }
+                    },
+                    "Select_Alerts": {
+                      "runAfter": {
+                        "Create_HTML_table_with_Entities": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "Select",
+                      "inputs": {
+                        "from": "@triggerBody()?['object']?['properties']?['Alerts']",
+                        "select": {
+                          "Alerts": "@item()?['properties']?['alertDisplayName']"
+                        }
+                      }
+                    },
+                    "Select_Entities": {
+                      "runAfter": {
+                        "For_each_value_in_the_JSON": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "Select",
+                      "inputs": {
+                        "from": "@triggerBody()?['object']?['properties']?['relatedEntities']",
+                        "select": {
+                          "Entity": "@item()?['properties']?['friendlyName']",
+                          "Entity type": "@item()?['kind']"
+                        }
+                      }
+                    },
+                    "Get_blob_content_(V2)": {
+                      "runAfter": {
+                        "Initialize_ContactSOCOOH": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connection": {
+                            "name": "@parameters('$connections')['azureblob']['connectionId']"
+                          }
+                        },
+                        "method": "get",
+                        "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('AccountNameFromSettings'))}/files/@{encodeURIComponent(encodeURIComponent('/alertlist/alertlist.json'))}/content",
+                        "queries": {
+                          "inferContentType": true
+                        }
+                      }
+                    },
+                    "Set_Original_Title": {
+                      "runAfter": {
+                        "Send_an_email_(V2)": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connection": {
+                            "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                          }
+                        },
+                        "method": "put",
+                        "body": {
+                          "incidentArmId": "@triggerBody()?['object']?['id']",
+                          "title": "@triggerBody()?['object']?['properties']?['title']",
+                          "description": "@triggerBody()?['object']?['properties']?['description']"
+                        },
+                        "path": "/Incidents"
+                      }
+                    },
+                    "Add_comment_to_incident_(V3)": {
+                      "runAfter": {
+                        "Set_Original_Title": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connection": {
+                            "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                          }
+                        },
+                        "method": "post",
+                        "body": {
+                          "incidentArmId": "@body('Set_Original_Title')?['id']",
+                          "message": "<p class=\"editor-paragraph\">Notification Sent to SOC.</p>"
+                        },
+                        "path": "/Incidents/Comment"
+                      }
+                    },
+                    "Send_an_email_(V2)": {
+                      "runAfter": {
+                        "Compose_Email_response": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connection": {
+                            "name": "@parameters('$connections')['office365']['connectionId']"
+                          }
+                        },
+                        "method": "post",
+                        "body": {
+                          "To": "@parameters('SendToEmail')",
+                          "Subject": "@{variables('ContactSOCOOH')}@{parameters('Client Name')} | Microsoft Sentinel Incident - @{triggerBody()?['object']?['properties']?['title']}",
+                          "Body": "<p class=\"editor-paragraph\">@{outputs('Compose_Email_response')}</p>"
+                        },
+                        "path": "/v2/Mail"
+                      }
+                    }
+                  },
+                  "outputs": {}
+                },
+                "parameters": {
+                  "$connections": {
+                    "value": {
+                      "azuresentinel": {
+                        "connectionId": "[resourceId('Microsoft.Web/connections', variables('MicrosoftSentinelConnectionName'))]",
+                        "connectionName": "[variables('MicrosoftSentinelConnectionName')]",
+                        "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azuresentinel')]",
+                        "connectionProperties": {
+                          "authentication": {
+                            "type": "ManagedServiceIdentity"
+                          }
+                        }
+                      },
+                      "azureblob": {
+                        "connectionId": "[resourceId('Microsoft.Web/connections', variables('AzureblobConnectionName'))]",
+                        "connectionName": "[variables('AzureblobConnectionName')]",
+                        "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azureblob')]",
+                        "connectionProperties": {}
+                      },
+                      "office365": {
+                        "connectionId": "[resourceId('Microsoft.Web/connections', variables('Office365ConnectionName'))]",
+                        "connectionName": "[variables('Office365ConnectionName')]",
+                        "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Office365')]",
+                        "connectionProperties": {}
+                      }
+                    }
+                  }
+                }
+              },
+              "name": "[parameters('PlaybookName')]",
+              "type": "Microsoft.Logic/workflows",
+              "location": "[resourceGroup().location]",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "tags": {
+                "hidden-SentinelTemplateName": "Send-email-with-formatted-incident-report",
+                "hidden-SentinelTemplateVersion": "1.0"
+              },
+              "apiVersion": "2017-07-01",
+              "dependsOn": [
+                "[resourceId('Microsoft.Web/connections', variables('MicrosoftSentinelConnectionName'))]",
+                "[resourceId('Microsoft.Web/connections', variables('AzureblobConnectionName'))]",
+                "[resourceId('Microsoft.Web/connections', variables('Office365ConnectionName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Web/connections",
+              "apiVersion": "2016-06-01",
+              "name": "[variables('MicrosoftSentinelConnectionName')]",
+              "location": "[resourceGroup().location]",
+              "kind": "V1",
+              "properties": {
+                "displayName": "[variables('MicrosoftSentinelConnectionName')]",
+                "customParameterValues": {},
+                "parameterValueType": "Alternative",
+                "api": {
+                  "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azuresentinel')]"
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Web/connections",
+              "apiVersion": "2016-06-01",
+              "name": "[variables('AzureblobConnectionName')]",
+              "location": "[resourceGroup().location]",
+              "kind": "V1",
+              "properties": {
+                "displayName": "[variables('AzureblobConnectionName')]",
+                "customParameterValues": {},
+                "api": {
+                  "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azureblob')]"
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Web/connections",
+              "apiVersion": "2016-06-01",
+              "name": "[variables('Office365ConnectionName')]",
+              "location": "[resourceGroup().location]",
+              "kind": "V1",
+              "properties": {
+                "displayName": "[variables('Office365ConnectionName')]",
+                "customParameterValues": {},
+                "api": {
+                  "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Office365')]"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "comments": "Deploy NotifyContactsOnTruePositive (workflow + connections) into the client RG. Authorise the Teams and Office365 connections in the portal after deployment. NOTE: the true-positive classification check is performed inside this playbook, not in the automation rule.",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "deploy-playbook-notify-true-positive",
+      "properties": {
+        "mode": "Incremental",
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "parameters": {
+          "Client Name": {
+            "value": "[parameters('clientDisplayName')]"
+          },
+          "Primary Contact": {
+            "value": "[parameters('primaryContact')]"
+          },
+          "Secondary Contact": {
+            "value": "[parameters('secondaryContact')]"
+          },
+          "Account Manager": {
+            "value": "[parameters('accountManager')]"
+          },
+          "HeadOfSupport": {
+            "value": "[parameters('headOfSupport')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "title": "",
+            "description": "",
+            "prerequisites": "",
+            "postDeployment": [],
+            "prerequisitesDeployTemplateFile": "",
+            "lastUpdateTime": "",
+            "entities": [],
+            "tags": [],
+            "support": {
+              "tier": "community",
+              "armtemplate": "Generated from https://github.com/Azure/Azure-Sentinel/tree/master/Tools/Playbook-ARM-Template-Generator"
+            },
+            "author": {
+              "name": ""
+            }
+          },
+          "parameters": {
+            "PlaybookName": {
+              "defaultValue": "NotifyContactsOnTruePositive",
+              "type": "string"
+            },
+            "Client Name": {
+              "type": "String",
+              "metadata": {
+                "description": "Enter value for Client Name"
+              }
+            },
+            "Primary Contact": {
+              "type": "String",
+              "metadata": {
+                "description": "Enter email for Primary Contact"
+              }
+            },
+            "Secondary Contact": {
+              "type": "String",
+              "metadata": {
+                "description": "Enter email for Secondary Contact"
+              }
+            },
+            "Account Manager": {
+              "type": "String",
+              "metadata": {
+                "description": "Enter email for Account Manager"
+              }
+            },
+            "HeadOfSupport": {
+              "type": "String",
+              "metadata": {
+                "description": "Enter email for HeadOfSupport"
+              }
+            }
+          },
+          "variables": {
+            "MicrosoftSentinelConnectionName": "[concat('MicrosoftSentinel-', parameters('PlaybookName'))]",
+            "TeamsConnectionName": "[concat('Teams-', parameters('PlaybookName'))]",
+            "Office365ConnectionName": "[concat('Office365-', parameters('PlaybookName'))]"
+          },
+          "resources": [
+            {
+              "properties": {
+                "provisioningState": "Succeeded",
+                "state": "Enabled",
+                "definition": {
+                  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                  "contentVersion": "1.0.0.0",
+                  "parameters": {
+                    "$connections": {
+                      "defaultValue": {},
+                      "type": "Object"
+                    },
+                    "Client Name": {
+                      "defaultValue": "[parameters('Client Name')]",
+                      "type": "String"
+                    },
+                    "Primary Contact": {
+                      "defaultValue": "[parameters('Primary Contact')]",
+                      "type": "String"
+                    },
+                    "Secondary Contact": {
+                      "defaultValue": "[parameters('Secondary Contact')]",
+                      "type": "String"
+                    },
+                    "Account Manager": {
+                      "defaultValue": "[parameters('Account Manager')]",
+                      "type": "String"
+                    },
+                    "HeadOfSupport": {
+                      "defaultValue": "[parameters('HeadOfSupport')]",
+                      "type": "String"
+                    }
+                  },
+                  "triggers": {
+                    "Microsoft_Sentinel_incident": {
+                      "type": "ApiConnectionWebhook",
+                      "inputs": {
+                        "host": {
+                          "connection": {
+                            "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                          }
+                        },
+                        "body": {
+                          "callback_url": "@{listCallbackUrl()}"
+                        },
+                        "path": "/incident-creation"
+                      }
+                    }
+                  },
+                  "actions": {
+                    "Initialize_Entity_Variable": {
+                      "runAfter": {},
+                      "type": "InitializeVariable",
+                      "inputs": {
+                        "variables": [
+                          {
+                            "name": "EntitiesList",
+                            "type": "string"
+                          }
+                        ]
+                      }
+                    },
+                    "If_Incident_is_True_Positive": {
+                      "actions": {
+                        "Post_Card_for_Approval": {
+                          "type": "ApiConnectionWebhook",
+                          "inputs": {
+                            "host": {
+                              "connection": {
+                                "name": "@parameters('$connections')['teams']['connectionId']"
+                              }
+                            },
+                            "body": {
+                              "notificationUrl": "@listCallbackUrl()",
+                              "body": {
+                                "messageBody": "{\n  \"$schema\": \"http://adaptivecards.io/schemas/adaptive-card.json\",\n  \"type\": \"AdaptiveCard\",\n  \"version\": \"1.5\",\n  \"body\": [\n    {\n      \"type\": \"TextBlock\",\n      \"text\": \"\ud83d\udd14 Incident Approval Required\",\n      \"weight\": \"Bolder\",\n      \"size\": \"Medium\",\n      \"color\": \"Attention\"\n    },\n    {\n      \"type\": \"TextBlock\",\n      \"text\": \"An incident has been marked as True Positive and requires your approval to proceed with notifying the primary contacts.\",\n      \"wrap\": true\n    },\n    {\n      \"type\": \"FactSet\",\n      \"facts\": [\n {\n          \"title\": \"Client:\",\n          \"value\": \"@{parameters('Client Name')}\"\n        },\n        {\n          \"title\": \"Incident ID:\",\n          \"value\": \"@{triggerBody()?['object']?['properties']?['incidentNumber']}\"\n        },\n        {\n          \"title\": \"Title:\",\n          \"value\": \"@{triggerBody()?['object']?['properties']?['title']}\"\n        },\n        {\n          \"title\": \"Severity:\",\n          \"value\": \"@{triggerBody()?['object']?['properties']?['severity']}\"\n        },\n        {\n          \"title\": \"Detected Time:\",\n          \"value\": \"@{formatDateTime(convertTimeZone(triggerBody()?['object']?['properties']?['createdTimeUtc'], 'UTC', 'GMT Standard Time'), 'dd/MM/yyyy hh:mm tt')\n}\"\n        }\n      ]\n    }\n  ],\n  \"actions\": [\n    {\n      \"type\": \"Action.Submit\",\n      \"title\": \"Approve\",\n      \"data\": {\n        \"response\": \"Approve\"\n      }\n    },\n    {\n      \"type\": \"Action.Submit\",\n      \"title\": \"Reject\",\n      \"data\": {\n        \"response\": \"Reject\"\n      }\n    }\n  ]\n}",
+                                "updateMessage": "Response Submitted.",
+                                "recipient": {
+                                  "groupId": "aa931da4-0d98-4d13-9d9e-a74397d3f03b",
+                                  "channelId": "19:cca12820b0134ec495ce6cf38724808f@thread.tacv2"
+                                }
+                              }
+                            },
+                            "path": "/v1.0/teams/conversation/gatherinput/poster/Flow bot/location/@{encodeURIComponent('Channel')}/$subscriptions"
+                          }
+                        },
+                        "Check_Response": {
+                          "actions": {
+                            "Select_Entities": {
+                              "type": "Select",
+                              "inputs": {
+                                "from": "@triggerBody()?['object']?['properties']?['relatedEntities']",
+                                "select": {
+                                  "Entity": "@item()?['properties']?['friendlyName']",
+                                  "EntityType": "@item()?['kind']"
+                                }
+                              }
+                            },
+                            "For_each": {
+                              "foreach": "@body('Select_Entities')",
+                              "actions": {
+                                "Append_to_string_variable_and_format": {
+                                  "type": "AppendToStringVariable",
+                                  "inputs": {
+                                    "name": "EntitiesList",
+                                    "value": "@concat('<li>', items('For_each')?['entitytype'], ': ', items('For_each')?['entity'], '</li>')"
+                                  }
+                                }
+                              },
+                              "runAfter": {
+                                "Select_Entities": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "type": "Foreach"
+                            },
+                            "Notify_Users": {
+                              "runAfter": {
+                                "For_each": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "type": "ApiConnection",
+                              "inputs": {
+                                "host": {
+                                  "connection": {
+                                    "name": "@parameters('$connections')['office365']['connectionId']"
+                                  }
+                                },
+                                "method": "post",
+                                "body": {
+                                  "To": "@{parameters('Primary Contact')}; @{parameters('Secondary Contact')}",
+                                  "Subject": "@{parameters('Client Name')}| Suspicious Activity Detected - @{triggerBody()?['object']?['properties']?['title']}",
+                                  "Body": "<h2 style=\"color:#d13438;\">\ud83d\udd14 True Positive Security Incident</h2>\n    <p>Please note that Conosco SOC has classified the following incident as a <strong>True Positive</strong>.</p>\n\n    <table style=\"border-collapse:collapse; width:100%; margin-top:10px;\">\n      <tbody><tr>\n        <td style=\"padding:8px; font-weight:bold;\">Incident ID:</td>\n        <td style=\"padding:8px;\">@{triggerBody()?['object']?['properties']?['incidentNumber']}</td>\n      </tr>\n      <tr>\n        <td style=\"padding:8px; font-weight:bold;\">Title:</td>\n        <td style=\"padding:8px;\">@{triggerBody()?['object']?['properties']?['title']}</td>\n      </tr>\n      <tr>\n        <td style=\"padding:8px; font-weight:bold;\">Entities Involved:</td>\n        <td style=\"padding:8px;\">@{variables('EntitiesList')}</td>\n      </tr>\n      <tr>\n        <td style=\"padding:8px; font-weight:bold;\">Initial Findings:</td>\n        <td style=\"padding:8px;\">@{triggerBody()?['object']?['properties']?['classificationComment']}</td>\n      </tr>\n      <tr>\n        <td style=\"padding:8px; font-weight:bold;\">Time Detected:</td>\n        <td style=\"padding:8px;\">@{formatDateTime(convertTimeZone(triggerBody()?['object']?['properties']?['createdTimeUtc'], 'UTC', 'GMT Standard Time'), 'dd/MM/yyyy hh:mm tt')\n}</td>\n      </tr>\n      <tr>\n        <td style=\"padding:8px; font-weight:bold;\">Severity:</td>\n        <td style=\"padding:8px;\">@{triggerBody()?['object']?['properties']?['severity']}</td>\n      </tr>\n    </tbody></table>\n\n    <p style=\"margin-top:20px;\">We are conducting further investigation and will provide updates as soon as possible.</p>\n    <p>If you have any questions or require immediate assistance, please contact the SOC.</p>\n\n    <p style=\"margin-top:20px;\">Best Regards,<br><strong>Conosco SOC</strong></p>\n  ",
+                                  "Cc": "soc@conosco.com; @{parameters('Account Manager')}; support@conosco.com; @{parameters('HeadOfSupport')}",
+                                  "Importance": "High"
+                                },
+                                "path": "/v2/Mail"
+                              }
+                            },
+                            "Post_Card_in_Major_Incident_Channel": {
+                              "runAfter": {
+                                "Notify_Users": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "type": "ApiConnection",
+                              "inputs": {
+                                "host": {
+                                  "connection": {
+                                    "name": "@parameters('$connections')['teams']['connectionId']"
+                                  }
+                                },
+                                "method": "post",
+                                "body": {
+                                  "recipient": {
+                                    "groupId": "d0d4a571-65e9-4ab1-9eaa-095e7b48abfe",
+                                    "channelId": "19:447546ae1eb54ab88338fed64fe222d5@thread.skype"
+                                  },
+                                  "messageBody": "{\n  \"$schema\": \"http://adaptivecards.io/schemas/adaptive-card.json\",\n  \"type\": \"AdaptiveCard\",\n  \"version\": \"1.4\",\n  \"body\": [\n    {\n      \"type\": \"TextBlock\",\n      \"text\": \"**Security Incident Notification**\",\n      \"weight\": \"Bolder\",\n      \"size\": \"Large\",\n      \"color\": \"Attention\"\n    },\n{\n      \"type\": \"TextBlock\",\n      \"text\": \"Please note that Conosco SOC has classified the following incident as a True Positive.\",\n      \"wrap\": true\n    },\n    {\n      \"type\": \"FactSet\",\n      \"facts\": [\n {\n          \"title\": \"**Client:**\",\n          \"value\": \"@{parameters('Client Name')}\"\n        },\n        {\n          \"title\": \"**Title:**\",\n          \"value\": \"@{triggerBody()?['object']?['properties']?['title']}\"\n        },\n        {\n          \"title\": \"**Initial Findings:**\",\n          \"value\": \"@{triggerBody()?['object']?['properties']?['classificationComment']}\"\n        },\n        {\n          \"title\": \"**Time Detected:**\",\n          \"value\": \"@{formatDateTime(convertTimeZone(triggerBody()?['object']?['properties']?['createdTimeUtc'], 'UTC', 'GMT Standard Time'), 'dd/MM/yyyy hh:mm tt')}\"\n        },\n        {\n          \"title\": \"**Severity:**\",\n          \"value\": \"@{triggerBody()?['object']?['properties']?['severity']}\"\n        }\n      ]\n    },\n    {\n      \"type\": \"TextBlock\",\n      \"text\": \"We are conducting further investigation and will provide updates as soon as possible.\",\n      \"wrap\": true\n    }\n  ]\n}"
+                                },
+                                "path": "/v1.0/teams/conversation/adaptivecard/poster/@{encodeURIComponent('User')}/location/@{encodeURIComponent('Channel')}"
+                              }
+                            }
+                          },
+                          "runAfter": {
+                            "Post_Card_for_Approval": [
+                              "Succeeded"
+                            ]
+                          },
+                          "else": {
+                            "actions": {}
+                          },
+                          "expression": {
+                            "and": [
+                              {
+                                "equals": [
+                                  "@body('Post_Card_for_Approval')?['data']?['response']",
+                                  "Approve"
+                                ]
+                              }
+                            ]
+                          },
+                          "type": "If"
+                        }
+                      },
+                      "runAfter": {
+                        "Initialize_Entity_Variable": [
+                          "Succeeded"
+                        ]
+                      },
+                      "else": {
+                        "actions": {}
+                      },
+                      "expression": {
+                        "and": [
+                          {
+                            "equals": [
+                              "@triggerBody()?['object']?['properties']?['classification']",
+                              "TruePositive"
+                            ]
+                          }
+                        ]
+                      },
+                      "type": "If"
+                    }
+                  },
+                  "outputs": {}
+                },
+                "parameters": {
+                  "$connections": {
+                    "value": {
+                      "azuresentinel": {
+                        "connectionId": "[resourceId('Microsoft.Web/connections', variables('MicrosoftSentinelConnectionName'))]",
+                        "connectionName": "[variables('MicrosoftSentinelConnectionName')]",
+                        "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azuresentinel')]",
+                        "connectionProperties": {
+                          "authentication": {
+                            "type": "ManagedServiceIdentity"
+                          }
+                        }
+                      },
+                      "teams": {
+                        "connectionId": "[resourceId('Microsoft.Web/connections', variables('TeamsConnectionName'))]",
+                        "connectionName": "[variables('TeamsConnectionName')]",
+                        "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Teams')]",
+                        "connectionProperties": {}
+                      },
+                      "office365": {
+                        "connectionId": "[resourceId('Microsoft.Web/connections', variables('Office365ConnectionName'))]",
+                        "connectionName": "[variables('Office365ConnectionName')]",
+                        "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Office365')]",
+                        "connectionProperties": {}
+                      }
+                    }
+                  }
+                }
+              },
+              "name": "[parameters('PlaybookName')]",
+              "type": "Microsoft.Logic/workflows",
+              "location": "[resourceGroup().location]",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "tags": {
+                "hidden-SentinelTemplateName": "NotifyContactsOnTruePositive",
+                "hidden-SentinelTemplateVersion": "1.0"
+              },
+              "apiVersion": "2017-07-01",
+              "dependsOn": [
+                "[resourceId('Microsoft.Web/connections', variables('MicrosoftSentinelConnectionName'))]",
+                "[resourceId('Microsoft.Web/connections', variables('TeamsConnectionName'))]",
+                "[resourceId('Microsoft.Web/connections', variables('Office365ConnectionName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Web/connections",
+              "apiVersion": "2016-06-01",
+              "name": "[variables('MicrosoftSentinelConnectionName')]",
+              "location": "[resourceGroup().location]",
+              "kind": "V1",
+              "properties": {
+                "displayName": "[variables('MicrosoftSentinelConnectionName')]",
+                "customParameterValues": {},
+                "parameterValueType": "Alternative",
+                "api": {
+                  "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azuresentinel')]"
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Web/connections",
+              "apiVersion": "2016-06-01",
+              "name": "[variables('TeamsConnectionName')]",
+              "location": "[resourceGroup().location]",
+              "kind": "V1",
+              "properties": {
+                "displayName": "[variables('TeamsConnectionName')]",
+                "customParameterValues": {},
+                "api": {
+                  "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Teams')]"
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Web/connections",
+              "apiVersion": "2016-06-01",
+              "name": "[variables('Office365ConnectionName')]",
+              "location": "[resourceGroup().location]",
+              "kind": "V1",
+              "properties": {
+                "displayName": "[variables('Office365ConnectionName')]",
+                "customParameterValues": {},
+                "api": {
+                  "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Office365')]"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/automationRules",
+      "apiVersion": "2022-12-01-preview",
+      "name": "[concat(variables('workspaceName'), '/Microsoft.SecurityInsights/', guid(variables('workspaceName'), 'rule-geotag'))]",
+      "properties": {
+        "displayName": "GeoTagIncident",
+        "order": 1,
+        "triggeringLogic": {
+          "isEnabled": true,
+          "triggersOn": "Incidents",
+          "triggersWhen": "Created",
+          "conditions": []
+        },
+        "actions": [
+          {
+            "order": 1,
+            "actionType": "RunPlaybook",
+            "actionConfiguration": {
+              "logicAppResourceId": "[concat(variables('centralPlaybookPrefix'), 'GeoTag_Incident')]",
+              "tenantId": "[parameters('conoscoTenantId')]"
+            }
+          }
+        ]
+      },
+      "condition": "[parameters('deployManagingTenantRules')]"
+    },
+    {
+      "comments": "Fires when an incident is closed. The NotifyContactsOnTruePositive playbook checks the classification internally and only notifies contacts when the closure is a true positive (classification is not a supported automation-rule condition property, so the gate lives in the playbook).",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/automationRules",
+      "apiVersion": "2022-12-01-preview",
+      "name": "[concat(variables('workspaceName'), '/Microsoft.SecurityInsights/', guid(variables('workspaceName'), 'rule-notify-true-positive'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'deploy-playbook-notify-true-positive')]"
+      ],
+      "properties": {
+        "displayName": "Notify Primary Contacts on True Positive",
+        "order": 2,
+        "triggeringLogic": {
+          "isEnabled": true,
+          "triggersOn": "Incidents",
+          "triggersWhen": "Updated",
+          "conditions": [
+            {
+              "conditionType": "PropertyChanged",
+              "conditionProperties": {
+                "propertyName": "IncidentStatus",
+                "changeType": "ChangedTo",
+                "operator": "Equals",
+                "propertyValues": [
+                  "Closed"
+                ]
+              }
+            }
+          ]
+        },
+        "actions": [
+          {
+            "order": 1,
+            "actionType": "RunPlaybook",
+            "actionConfiguration": {
+              "logicAppResourceId": "[resourceId('Microsoft.Logic/workflows', 'NotifyContactsOnTruePositive')]",
+              "tenantId": "[parameters('tenantId')]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/automationRules",
+      "apiVersion": "2022-12-01-preview",
+      "name": "[concat(variables('workspaceName'), '/Microsoft.SecurityInsights/', guid(variables('workspaceName'), 'rule-email-enrichment'))]",
+      "properties": {
+        "displayName": "EmailAlertEnrichment",
+        "order": 10,
+        "triggeringLogic": {
+          "isEnabled": true,
+          "triggersOn": "Incidents",
+          "triggersWhen": "Created",
+          "conditions": [
+            {
+              "conditionType": "Property",
+              "conditionProperties": {
+                "propertyName": "IncidentTitle",
+                "operator": "Contains",
+                "propertyValues": [
+                  "Email reported by user"
+                ]
+              }
+            }
+          ]
+        },
+        "actions": [
+          {
+            "order": 1,
+            "actionType": "RunPlaybook",
+            "actionConfiguration": {
+              "logicAppResourceId": "[concat(variables('centralPlaybookPrefix'), 'MDR-EmailAlertEnrichment')]",
+              "tenantId": "[parameters('conoscoTenantId')]"
+            }
+          }
+        ]
+      },
+      "condition": "[parameters('deployManagingTenantRules')]"
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/automationRules",
+      "apiVersion": "2022-12-01-preview",
+      "name": "[concat(variables('workspaceName'), '/Microsoft.SecurityInsights/', guid(variables('workspaceName'), 'rule-get-soc-actions'))]",
+      "properties": {
+        "displayName": "Get-SOCActions",
+        "order": 99,
+        "triggeringLogic": {
+          "isEnabled": true,
+          "triggersOn": "Incidents",
+          "triggersWhen": "Created",
+          "conditions": []
+        },
+        "actions": [
+          {
+            "order": 1,
+            "actionType": "RunPlaybook",
+            "actionConfiguration": {
+              "logicAppResourceId": "[concat(variables('centralPlaybookPrefix'), 'Get-SOCActions')]",
+              "tenantId": "[parameters('conoscoTenantId')]"
+            }
+          }
+        ]
+      },
+      "condition": "[parameters('deployManagingTenantRules')]"
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/automationRules",
+      "apiVersion": "2022-12-01-preview",
+      "name": "[concat(variables('workspaceName'), '/Microsoft.SecurityInsights/', guid(variables('workspaceName'), 'rule-halo-multitenant'))]",
+      "properties": {
+        "displayName": "SentinelHaloIntegration-MultiTenant",
+        "order": 100,
+        "triggeringLogic": {
+          "isEnabled": true,
+          "triggersOn": "Incidents",
+          "triggersWhen": "Created",
+          "conditions": [
+            {
+              "conditionType": "Property",
+              "conditionProperties": {
+                "propertyName": "IncidentStatus",
+                "operator": "NotEquals",
+                "propertyValues": [
+                  "Closed"
+                ]
+              }
+            }
+          ]
+        },
+        "actions": [
+          {
+            "order": 1,
+            "actionType": "RunPlaybook",
+            "actionConfiguration": {
+              "logicAppResourceId": "[concat(variables('centralPlaybookPrefix'), 'HaloIntegration_MultiTenant')]",
+              "tenantId": "[parameters('conoscoTenantId')]"
+            }
+          }
+        ]
+      },
+      "condition": "[parameters('deployManagingTenantRules')]"
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/providers/automationRules",
+      "apiVersion": "2022-12-01-preview",
+      "name": "[concat(variables('workspaceName'), '/Microsoft.SecurityInsights/', guid(variables('workspaceName'), 'rule-notify-soc'))]",
+      "properties": {
+        "displayName": "NotifySOC",
+        "order": 101,
+        "triggeringLogic": {
+          "isEnabled": true,
+          "triggersOn": "Incidents",
+          "triggersWhen": "Created",
+          "conditions": [
+            {
+              "conditionType": "Property",
+              "conditionProperties": {
+                "propertyName": "IncidentStatus",
+                "operator": "NotEquals",
+                "propertyValues": [
+                  "Closed"
+                ]
+              }
+            }
+          ]
+        },
+        "actions": [
+          {
+            "order": 1,
+            "actionType": "RunPlaybook",
+            "actionConfiguration": {
+              "logicAppResourceId": "[resourceId('Microsoft.Logic/workflows', 'Send_Incident_To_Conosco_SOC')]",
+              "tenantId": "[parameters('tenantId')]"
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'deploy-playbook-send-incident')]"
+      ]
+    }
+  ],
+  "outputs": {
+    "localPlaybooks": {
+      "type": "object",
+      "value": {
+        "sendIncident": "[resourceId('Microsoft.Logic/workflows', 'Send_Incident_To_Conosco_SOC')]",
+        "notifyTruePositive": "[resourceId('Microsoft.Logic/workflows', 'NotifyContactsOnTruePositive')]"
+      }
+    },
+    "managingTenantRulesDeployed": {
+      "type": "bool",
+      "value": "[parameters('deployManagingTenantRules')]"
+    }
+  }
+}

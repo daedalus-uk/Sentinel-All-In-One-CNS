@@ -1,0 +1,106 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-08-01/subscriptionDeploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "mspOfferName": {
+      "type": "string",
+      "metadata": {
+        "description": "Specify a unique name for your offer"
+      },
+      "defaultValue": "Conosco SOC - Integration"
+    },
+    "mspOfferDescription": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the Managed Service Provider offering"
+      },
+      "defaultValue": "This Lighthouse package integrates the Conosco SOC service with your Sentinel instance."
+    }
+  },
+  "variables": {
+    "mspRegistrationName": "[guid(parameters('mspOfferName'))]",
+    "mspAssignmentName": "[guid(parameters('mspOfferName'))]",
+    "managedByTenantId": "4ccdd9df-c201-4d7b-b4b5-419eb462fdd5",
+    "authorizations": [
+      {
+        "principalId": "9e0fd891-09ec-4ed6-8f29-f766a8372ccf",
+        "roleDefinitionId": "ab8e14d6-4a74-4a29-9ba8-549422addade",
+        "principalIdDisplayName": "MS-Pim-SOCteam"
+      },
+      {
+        "principalId": "9e0fd891-09ec-4ed6-8f29-f766a8372ccf",
+        "roleDefinitionId": "f4c81013-99ee-4d62-a7ee-b3f1f648599a",
+        "principalIdDisplayName": "MS-Pim-SOCteam"
+      },
+      {
+        "principalId": "9e0fd891-09ec-4ed6-8f29-f766a8372ccf",
+        "roleDefinitionId": "f1a07417-d97a-45cb-824c-7a7467783830",
+        "principalIdDisplayName": "MS-Pim-SOCteam"
+      },
+      {
+        "principalId": "9e0fd891-09ec-4ed6-8f29-f766a8372ccf",
+        "roleDefinitionId": "92aaf0da-9dab-42b6-94a3-d43ce8d16293",
+        "principalIdDisplayName": "MS-Pim-SOCteam"
+      },
+      {
+        "principalId": "9e0fd891-09ec-4ed6-8f29-f766a8372ccf",
+        "roleDefinitionId": "fb1c8493-542b-48eb-b624-b4c8fea62acd",
+        "principalIdDisplayName": "MS-Pim-SOCteam"
+      },
+      {
+        "principalId": "9e0fd891-09ec-4ed6-8f29-f766a8372ccf",
+        "roleDefinitionId": "87a39d53-fc1b-424a-814c-f7e04687dc9e",
+        "principalIdDisplayName": "MS-Pim-SOCteam"
+      },
+      {
+        "principalId": "9e0fd891-09ec-4ed6-8f29-f766a8372ccf",
+        "roleDefinitionId": "515c2055-d9d4-4321-b1b9-bd0c9a0f79fe",
+        "principalIdDisplayName": "MS-Pim-SOCteam"
+      },
+      {
+        "principalId": "9e0fd891-09ec-4ed6-8f29-f766a8372ccf",
+        "roleDefinitionId": "e40ec5ca-96e0-45a2-b4ff-59039f2c2b59",
+        "principalIdDisplayName": "MS-Pim-SOCteam"
+      },
+      {
+        "principalId": "53d468b4-0a69-4f43-8c1c-aa6acd53a350",
+        "principalIdDisplayName": "SOC_Handover_Digest_Afternoon",
+        "roleDefinitionId": "73c42c96-874c-492b-b04d-ab87d138a893"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "type": "Microsoft.ManagedServices/registrationDefinitions",
+      "apiVersion": "2020-02-01-preview",
+      "name": "[variables('mspRegistrationName')]",
+      "properties": {
+        "registrationDefinitionName": "[parameters('mspOfferName')]",
+        "description": "[parameters('mspOfferDescription')]",
+        "managedByTenantId": "[variables('managedByTenantId')]",
+        "authorizations": "[variables('authorizations')]"
+      }
+    },
+    {
+      "type": "Microsoft.ManagedServices/registrationAssignments",
+      "apiVersion": "2020-02-01-preview",
+      "name": "[variables('mspAssignmentName')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedServices/registrationDefinitions/', variables('mspRegistrationName'))]"
+      ],
+      "properties": {
+        "registrationDefinitionId": "[resourceId('Microsoft.ManagedServices/registrationDefinitions/', variables('mspRegistrationName'))]"
+      }
+    }
+  ],
+  "outputs": {
+    "mspOfferName": {
+      "type": "string",
+      "value": "[concat('Managed by', ' ', parameters('mspOfferName'))]"
+    },
+    "authorizations": {
+      "type": "array",
+      "value": "[variables('authorizations')]"
+    }
+  }
+}

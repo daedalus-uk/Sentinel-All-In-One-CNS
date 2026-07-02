@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "clientName": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 20,
+      "metadata": {
+        "description": "Short identifier for the client (lowercase letters, numbers and hyphens only). Resources will be named: cns-<clientName>-sentinel"
+      }
+    }
+  },
+  "variables": {
+    "workspaceName": "[concat('cns-', parameters('clientName'), '-sentinel')]",
+    "location": "uksouth"
+  },
+  "resources": [
+    {
+      "comments": "Log Analytics Workspace \u2014 90-day retention, pay-as-you-go, UK South.",
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2022-10-01",
+      "name": "[variables('workspaceName')]",
+      "location": "[variables('location')]",
+      "properties": {
+        "sku": {
+          "name": "PerGB2018"
+        },
+        "retentionInDays": 90,
+        "workspaceCapping": {
+          "dailyQuotaGb": -1
+        }
+      }
+    },
+    {
+      "comments": "Install Microsoft Sentinel solution on the workspace.",
+      "type": "Microsoft.OperationsManagement/solutions",
+      "apiVersion": "2015-11-01-preview",
+      "name": "[concat('SecurityInsights(', variables('workspaceName'), ')')]",
+      "location": "[variables('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('workspaceName'))]"
+      ],
+      "plan": {
+        "name": "[concat('SecurityInsights(', variables('workspaceName'), ')')]",
+        "promotionCode": "",
+        "product": "OMSGallery/SecurityInsights",
+        "publisher": "Microsoft"
+      },
+      "properties": {
+        "workspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('workspaceName'))]"
+      }
+    },
+    {
+      "comments": "Formally onboards the workspace to Microsoft Sentinel. Sentinel settings, connectors and playbook permissions are applied afterwards by Configure-SentinelSettings.ps1, run as the onboarding admin.",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/onboardingStates",
+      "apiVersion": "2024-03-01",
+      "name": "[concat(variables('workspaceName'), '/Microsoft.SecurityInsights/default')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationsManagement/solutions', concat('SecurityInsights(', variables('workspaceName'), ')'))]"
+      ],
+      "properties": {
+        "customerManagedKey": false
+      }
+    }
+  ],
+  "outputs": {
+    "workspaceName": {
+      "type": "string",
+      "value": "[variables('workspaceName')]"
+    },
+    "workspaceResourceId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('workspaceName'))]"
+    },
+    "workspaceCustomerId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', variables('workspaceName'))).customerId]"
+    }
+  }
+}
