@@ -1,0 +1,362 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "metadata": {
+        "title": "",
+        "description": "",
+        "prerequisites": "",
+    "postDeployment": [],
+    "prerequisitesDeployTemplateFile": "",
+    "lastUpdateTime": "",
+"entities": [],
+"tags": [],
+"support": {
+"tier": "community",
+"armtemplate": "Generated from https://github.com/Azure/Azure-Sentinel/tree/master/Tools/Playbook-ARM-Template-Generator"
+},
+"author": {
+"name": ""
+}
+},
+"parameters": {
+"PlaybookName": {
+"defaultValue": "NotifyContactsOnTruePositive",
+"type": "string"
+},
+"Client Name": {
+"type": "String",
+"metadata": {
+    "description": "Enter value for Client Name"
+}
+},
+"Primary Contact": {
+"type": "String",
+"metadata": {
+    "description": "Enter email for Primary Contact"
+}
+},
+"Secondary Contact": {
+"type": "String",
+"metadata": {
+    "description": "Enter email for Secondary Contact"
+}
+},
+"Account Manager": {
+"type": "String",
+"metadata": {
+    "description": "Enter email for Account Manager"
+}
+},
+"HeadOfSupport": {
+"type": "String",
+"metadata": {
+    "description": "Enter email for HeadOfSupport"
+}
+}
+},
+"variables": {
+"MicrosoftSentinelConnectionName": "[concat('MicrosoftSentinel-', parameters('PlaybookName'))]",
+"TeamsConnectionName": "[concat('Teams-', parameters('PlaybookName'))]",
+"Office365ConnectionName": "[concat('Office365-', parameters('PlaybookName'))]"
+},
+"resources": [
+{
+"properties": {
+    "provisioningState": "Succeeded",
+    "state": "Enabled",
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "contentVersion": "1.0.0.0",
+        "parameters": {
+            "$connections": {
+            "defaultValue": {},
+            "type": "Object"
+        },
+        "Client Name": {
+            "defaultValue": "[parameters('Client Name')]",
+            "type": "String"
+        },
+        "Primary Contact": {
+            "defaultValue": "[parameters('Primary Contact')]",
+            "type": "String"
+        },
+        "Secondary Contact": {
+            "defaultValue": "[parameters('Secondary Contact')]",
+            "type": "String"
+        },
+        "Account Manager": {
+            "defaultValue": "[parameters('Account Manager')]",
+            "type": "String"
+        },
+        "HeadOfSupport": {
+            "defaultValue": "[parameters('HeadOfSupport')]",
+            "type": "String"
+        }
+    },
+    "triggers": {
+        "Microsoft_Sentinel_incident": {
+            "type": "ApiConnectionWebhook",
+            "inputs": {
+                "host": {
+                    "connection": {
+                        "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                    }
+                },
+                "body": {
+                    "callback_url": "@{listCallbackUrl()}"
+                },
+                "path": "/incident-creation"
+            }
+        }
+    },
+    "actions": {
+        "Initialize_Entity_Variable": {
+        "runAfter": {},
+        "type": "InitializeVariable",
+        "inputs": {
+            "variables": [
+                {
+                    "name": "EntitiesList",
+                    "type": "string"
+                }
+            ]
+        }
+    },
+    "If_Incident_is_True_Positive": {
+        "actions": {
+            "Post_Card_for_Approval": {
+                "type": "ApiConnectionWebhook",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['teams']['connectionId']"
+                        }
+                    },
+                    "body": {
+                        "notificationUrl": "@listCallbackUrl()",
+                        "body": {
+                            "messageBody": "{\n  \"$schema\": \"http://adaptivecards.io/schemas/adaptive-card.json\",\n  \"type\": \"AdaptiveCard\",\n  \"version\": \"1.5\",\n  \"body\": [\n    {\n      \"type\": \"TextBlock\",\n      \"text\": \"🔔 Incident Approval Required\",\n      \"weight\": \"Bolder\",\n      \"size\": \"Medium\",\n      \"color\": \"Attention\"\n    },\n    {\n      \"type\": \"TextBlock\",\n      \"text\": \"An incident has been marked as True Positive and requires your approval to proceed with notifying the primary contacts.\",\n      \"wrap\": true\n    },\n    {\n      \"type\": \"FactSet\",\n      \"facts\": [\n {\n          \"title\": \"Client:\",\n          \"value\": \"@{parameters('Client Name')}\"\n        },\n        {\n          \"title\": \"Incident ID:\",\n          \"value\": \"@{triggerBody()?['object']?['properties']?['incidentNumber']}\"\n        },\n        {\n          \"title\": \"Title:\",\n          \"value\": \"@{triggerBody()?['object']?['properties']?['title']}\"\n        },\n        {\n          \"title\": \"Severity:\",\n          \"value\": \"@{triggerBody()?['object']?['properties']?['severity']}\"\n        },\n        {\n          \"title\": \"Detected Time:\",\n          \"value\": \"@{formatDateTime(convertTimeZone(triggerBody()?['object']?['properties']?['createdTimeUtc'], 'UTC', 'GMT Standard Time'), 'dd/MM/yyyy hh:mm tt')\n}\"\n        }\n      ]\n    }\n  ],\n  \"actions\": [\n    {\n      \"type\": \"Action.Submit\",\n      \"title\": \"Approve\",\n      \"data\": {\n        \"response\": \"Approve\"\n      }\n    },\n    {\n      \"type\": \"Action.Submit\",\n      \"title\": \"Reject\",\n      \"data\": {\n        \"response\": \"Reject\"\n      }\n    }\n  ]\n}",
+                            "updateMessage": "Response Submitted.",
+                            "recipient": {
+                                "groupId": "aa931da4-0d98-4d13-9d9e-a74397d3f03b",
+                                "channelId": "19:cca12820b0134ec495ce6cf38724808f@thread.tacv2"
+                            }
+                        }
+                    },
+                    "path": "/v1.0/teams/conversation/gatherinput/poster/Flow bot/location/@{encodeURIComponent('Channel')}/$subscriptions"
+                }
+            },
+            "Check_Response": {
+                "actions": {
+                    "Select_Entities": {
+                        "type": "Select",
+                        "inputs": {
+                            "from": "@triggerBody()?['object']?['properties']?['relatedEntities']",
+                            "select": {
+                                "Entity": "@item()?['properties']?['friendlyName']",
+                                "EntityType": "@item()?['kind']"
+                            }
+                        }
+                    },
+                    "For_each": {
+                        "foreach": "@body('Select_Entities')",
+                        "actions": {
+                            "Append_to_string_variable_and_format": {
+                                "type": "AppendToStringVariable",
+                                "inputs": {
+                                    "name": "EntitiesList",
+                                    "value": "@concat('<li>', items('For_each')?['entitytype'], ': ', items('For_each')?['entity'], '</li>')"
+                                }
+                            }
+                        },
+                        "runAfter": {
+                            "Select_Entities": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "Foreach"
+                    },
+                    "Notify_Users": {
+                        "runAfter": {
+                            "For_each": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "ApiConnection",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['office365']['connectionId']"
+                                }
+                            },
+                            "method": "post",
+                            "body": {
+                                "To": "@{parameters('Primary Contact')}; @{parameters('Secondary Contact')}",
+                                "Subject": "@{parameters('Client Name')}| Suspicious Activity Detected - @{triggerBody()?['object']?['properties']?['title']}",
+                                "Body": "<h2 style=\"color:#d13438;\">🔔 True Positive Security Incident</h2>\n    <p>Please note that Conosco SOC has classified the following incident as a <strong>True Positive</strong>.</p>\n\n    <table style=\"border-collapse:collapse; width:100%; margin-top:10px;\">\n      <tbody><tr>\n        <td style=\"padding:8px; font-weight:bold;\">Incident ID:</td>\n        <td style=\"padding:8px;\">@{triggerBody()?['object']?['properties']?['incidentNumber']}</td>\n      </tr>\n      <tr>\n        <td style=\"padding:8px; font-weight:bold;\">Title:</td>\n        <td style=\"padding:8px;\">@{triggerBody()?['object']?['properties']?['title']}</td>\n      </tr>\n      <tr>\n        <td style=\"padding:8px; font-weight:bold;\">Entities Involved:</td>\n        <td style=\"padding:8px;\">@{variables('EntitiesList')}</td>\n      </tr>\n      <tr>\n        <td style=\"padding:8px; font-weight:bold;\">Initial Findings:</td>\n        <td style=\"padding:8px;\">@{triggerBody()?['object']?['properties']?['classificationComment']}</td>\n      </tr>\n      <tr>\n        <td style=\"padding:8px; font-weight:bold;\">Time Detected:</td>\n        <td style=\"padding:8px;\">@{formatDateTime(convertTimeZone(triggerBody()?['object']?['properties']?['createdTimeUtc'], 'UTC', 'GMT Standard Time'), 'dd/MM/yyyy hh:mm tt')\n}</td>\n      </tr>\n      <tr>\n        <td style=\"padding:8px; font-weight:bold;\">Severity:</td>\n        <td style=\"padding:8px;\">@{triggerBody()?['object']?['properties']?['severity']}</td>\n      </tr>\n    </tbody></table>\n\n    <p style=\"margin-top:20px;\">We are conducting further investigation and will provide updates as soon as possible.</p>\n    <p>If you have any questions or require immediate assistance, please contact the SOC.</p>\n\n    <p style=\"margin-top:20px;\">Best Regards,<br><strong>Conosco SOC</strong></p>\n  ",
+                                "Cc": "soc@conosco.com; @{parameters('Account Manager')}; support@conosco.com; @{parameters('HeadOfSupport')}",
+                                "Importance": "High"
+                            },
+                            "path": "/v2/Mail"
+                        }
+                    },
+                    "Post_Card_in_Major_Incident_Channel": {
+                        "runAfter": {
+                            "Notify_Users": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "ApiConnection",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['teams']['connectionId']"
+                                }
+                            },
+                            "method": "post",
+                            "body": {
+                                "recipient": {
+                                    "groupId": "d0d4a571-65e9-4ab1-9eaa-095e7b48abfe",
+                                    "channelId": "19:447546ae1eb54ab88338fed64fe222d5@thread.skype"
+                                },
+                                "messageBody": "{\n  \"$schema\": \"http://adaptivecards.io/schemas/adaptive-card.json\",\n  \"type\": \"AdaptiveCard\",\n  \"version\": \"1.4\",\n  \"body\": [\n    {\n      \"type\": \"TextBlock\",\n      \"text\": \"**Security Incident Notification**\",\n      \"weight\": \"Bolder\",\n      \"size\": \"Large\",\n      \"color\": \"Attention\"\n    },\n{\n      \"type\": \"TextBlock\",\n      \"text\": \"Please note that Conosco SOC has classified the following incident as a True Positive.\",\n      \"wrap\": true\n    },\n    {\n      \"type\": \"FactSet\",\n      \"facts\": [\n {\n          \"title\": \"**Client:**\",\n          \"value\": \"@{parameters('Client Name')}\"\n        },\n        {\n          \"title\": \"**Title:**\",\n          \"value\": \"@{triggerBody()?['object']?['properties']?['title']}\"\n        },\n        {\n          \"title\": \"**Initial Findings:**\",\n          \"value\": \"@{triggerBody()?['object']?['properties']?['classificationComment']}\"\n        },\n        {\n          \"title\": \"**Time Detected:**\",\n          \"value\": \"@{formatDateTime(convertTimeZone(triggerBody()?['object']?['properties']?['createdTimeUtc'], 'UTC', 'GMT Standard Time'), 'dd/MM/yyyy hh:mm tt')}\"\n        },\n        {\n          \"title\": \"**Severity:**\",\n          \"value\": \"@{triggerBody()?['object']?['properties']?['severity']}\"\n        }\n      ]\n    },\n    {\n      \"type\": \"TextBlock\",\n      \"text\": \"We are conducting further investigation and will provide updates as soon as possible.\",\n      \"wrap\": true\n    }\n  ]\n}"
+                            },
+                            "path": "/v1.0/teams/conversation/adaptivecard/poster/@{encodeURIComponent('User')}/location/@{encodeURIComponent('Channel')}"
+                        }
+                    }
+                },
+                "runAfter": {
+                    "Post_Card_for_Approval": [
+                        "Succeeded"
+                    ]
+                },
+                "else": {
+                "actions": {}
+            },
+            "expression": {
+                "and": [
+                    {
+                        "equals": [
+                            "@body('Post_Card_for_Approval')?['data']?['response']",
+                            "Approve"
+                        ]
+                    }
+                ]
+            },
+            "type": "If"
+        }
+    },
+    "runAfter": {
+        "Initialize_Entity_Variable": [
+            "Succeeded"
+        ]
+    },
+    "else": {
+    "actions": {}
+},
+"expression": {
+    "and": [
+        {
+            "equals": [
+                "@triggerBody()?['object']?['properties']?['classification']",
+                "TruePositive"
+            ]
+        }
+    ]
+},
+"type": "If"
+}
+},
+"outputs": {}
+},
+"parameters": {
+"$connections": {
+"value": {
+"azuresentinel": {
+"connectionId": "[resourceId('Microsoft.Web/connections', variables('MicrosoftSentinelConnectionName'))]",
+"connectionName": "[variables('MicrosoftSentinelConnectionName')]",
+"id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azuresentinel')]",
+"connectionProperties": {
+    "authentication": {
+        "type": "ManagedServiceIdentity"
+    }
+}
+},
+"teams": {
+"connectionId": "[resourceId('Microsoft.Web/connections', variables('TeamsConnectionName'))]",
+"connectionName": "[variables('TeamsConnectionName')]",
+"id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Teams')]",
+"connectionProperties": {}
+},
+"office365": {
+"connectionId": "[resourceId('Microsoft.Web/connections', variables('Office365ConnectionName'))]",
+"connectionName": "[variables('Office365ConnectionName')]",
+"id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Office365')]",
+"connectionProperties": {}
+}
+}
+}
+}
+},
+"name": "[parameters('PlaybookName')]",
+"type": "Microsoft.Logic/workflows",
+"location": "[resourceGroup().location]",
+"identity": {
+"type": "SystemAssigned"
+},
+"tags": {
+"hidden-SentinelTemplateName": "NotifyContactsOnTruePositive",
+"hidden-SentinelTemplateVersion": "1.0"
+},
+"apiVersion": "2017-07-01",
+"dependsOn": [
+"[resourceId('Microsoft.Web/connections', variables('MicrosoftSentinelConnectionName'))]",
+"[resourceId('Microsoft.Web/connections', variables('TeamsConnectionName'))]",
+"[resourceId('Microsoft.Web/connections', variables('Office365ConnectionName'))]"
+]
+},
+{
+"type": "Microsoft.Web/connections",
+"apiVersion": "2016-06-01",
+"name": "[variables('MicrosoftSentinelConnectionName')]",
+"location": "[resourceGroup().location]",
+"kind": "V1",
+"properties": {
+"displayName": "[variables('MicrosoftSentinelConnectionName')]",
+"customParameterValues": {},
+"parameterValueType": "Alternative",
+"api": {
+"id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azuresentinel')]"
+}
+}
+},
+{
+"type": "Microsoft.Web/connections",
+"apiVersion": "2016-06-01",
+"name": "[variables('TeamsConnectionName')]",
+"location": "[resourceGroup().location]",
+"kind": "V1",
+"properties": {
+"displayName": "[variables('TeamsConnectionName')]",
+"customParameterValues": {},
+"api": {
+"id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Teams')]"
+}
+}
+},
+{
+"type": "Microsoft.Web/connections",
+"apiVersion": "2016-06-01",
+"name": "[variables('Office365ConnectionName')]",
+"location": "[resourceGroup().location]",
+"kind": "V1",
+"properties": {
+"displayName": "[variables('Office365ConnectionName')]",
+"customParameterValues": {},
+"api": {
+"id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Office365')]"
+}
+}
+}
+]
+}
